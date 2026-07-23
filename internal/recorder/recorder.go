@@ -5,38 +5,71 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 )
 
+func writeLE(w io.Writer, data any) error {
+	return binary.Write(w, binary.LittleEndian, data)
+}
+
 func WriteWAV(filename string, data []int16, sampleRate int) error {
 	f, err := os.Create(filename)
 	if err != nil {
-		return err
+		return fmt.Errorf("create file: %w", err)
 	}
 	defer f.Close()
 
 	dataSize := len(data) * 2
 	fileSize := 36 + dataSize
 
-	binary.Write(f, binary.LittleEndian, []byte("RIFF"))
-	binary.Write(f, binary.LittleEndian, uint32(fileSize))
-	binary.Write(f, binary.LittleEndian, []byte("WAVE"))
-	binary.Write(f, binary.LittleEndian, []byte("fmt "))
-	binary.Write(f, binary.LittleEndian, uint32(16))
-	binary.Write(f, binary.LittleEndian, uint16(1))
-	binary.Write(f, binary.LittleEndian, uint16(1))
-	binary.Write(f, binary.LittleEndian, uint32(sampleRate))
-	binary.Write(f, binary.LittleEndian, uint32(sampleRate*2))
-	binary.Write(f, binary.LittleEndian, uint16(2))
-	binary.Write(f, binary.LittleEndian, uint16(16))
-	binary.Write(f, binary.LittleEndian, []byte("data"))
-	binary.Write(f, binary.LittleEndian, uint32(dataSize))
+	if err := writeLE(f, []byte("RIFF")); err != nil {
+		return fmt.Errorf("write RIFF: %w", err)
+	}
+	if err := writeLE(f, uint32(fileSize)); err != nil {
+		return fmt.Errorf("write file size: %w", err)
+	}
+	if err := writeLE(f, []byte("WAVE")); err != nil {
+		return fmt.Errorf("write WAVE: %w", err)
+	}
+	if err := writeLE(f, []byte("fmt ")); err != nil {
+		return fmt.Errorf("write fmt: %w", err)
+	}
+	if err := writeLE(f, uint32(16)); err != nil {
+		return fmt.Errorf("write fmt size: %w", err)
+	}
+	if err := writeLE(f, uint16(1)); err != nil {
+		return fmt.Errorf("write audio format: %w", err)
+	}
+	if err := writeLE(f, uint16(1)); err != nil {
+		return fmt.Errorf("write channels: %w", err)
+	}
+	if err := writeLE(f, uint32(sampleRate)); err != nil {
+		return fmt.Errorf("write sample rate: %w", err)
+	}
+	if err := writeLE(f, uint32(sampleRate*2)); err != nil {
+		return fmt.Errorf("write byte rate: %w", err)
+	}
+	if err := writeLE(f, uint16(2)); err != nil {
+		return fmt.Errorf("write block align: %w", err)
+	}
+	if err := writeLE(f, uint16(16)); err != nil {
+		return fmt.Errorf("write bits per sample: %w", err)
+	}
+	if err := writeLE(f, []byte("data")); err != nil {
+		return fmt.Errorf("write data header: %w", err)
+	}
+	if err := writeLE(f, uint32(dataSize)); err != nil {
+		return fmt.Errorf("write data size: %w", err)
+	}
 
-	for _, s := range data {
-		binary.Write(f, binary.LittleEndian, s)
+	for i, s := range data {
+		if err := writeLE(f, s); err != nil {
+			return fmt.Errorf("write sample %d: %w", i, err)
+		}
 	}
 	return nil
 }
@@ -83,12 +116,13 @@ func UploadHTTPS(url string, data []int16, sampleRate int, timeout int, skipVeri
 
 	resp, err := client.Post(url, "multipart/form-data; boundary=boundary", &buf)
 	if err != nil {
-		return fmt.Errorf("HTTPS upload failed: %w", err)
+		return fmt.Errorf("HTTPS POST: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("HTTPS upload: status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTPS upload status %d: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }

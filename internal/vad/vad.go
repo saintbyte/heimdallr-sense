@@ -3,18 +3,17 @@ package vad
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 
 	webvad "github.com/rolandhe/go-vad"
 )
 
 type Processor struct {
-	vad          *webvad.VAD
-	frameLen     int
-	chunkLen     int
+	vad            *webvad.VAD
+	frameLen       int
+	chunkLen       int
 	framesPerChunk int
-	voiceThresh  int
-	silenceThresh int
+	voiceThresh    int
+	silenceThresh  int
 }
 
 func NewProcessor(sampleRate, vadFrameMs, framesPerChunk, voiceThresh, silenceThresh, vadMode int) *Processor {
@@ -26,21 +25,22 @@ func NewProcessor(sampleRate, vadFrameMs, framesPerChunk, voiceThresh, silenceTh
 	v.SetMode(webvad.Mode(vadMode))
 
 	return &Processor{
-		vad:             v,
-		frameLen:        frameLen,
-		chunkLen:        chunkLen,
-		framesPerChunk:  framesPerChunk,
-		voiceThresh:     voiceThresh,
-		silenceThresh:   silenceThresh,
+		vad:            v,
+		frameLen:       frameLen,
+		chunkLen:       chunkLen,
+		framesPerChunk: framesPerChunk,
+		voiceThresh:    voiceThresh,
+		silenceThresh:  silenceThresh,
 	}
 }
 
-func (p *Processor) FrameLen() int  { return p.frameLen }
-func (p *Processor) ChunkLen() int  { return p.chunkLen }
+func (p *Processor) FrameLen() int   { return p.frameLen }
+func (p *Processor) ChunkLen() int   { return p.chunkLen }
 func (p *Processor) ChunkBytes() int { return p.chunkLen * 2 }
 
-func (p *Processor) ProcessChunk(raw []byte) (voiceCount int) {
+func (p *Processor) ProcessChunk(raw []byte) (int, error) {
 	frame := make([]int16, p.frameLen)
+	voiceCount := 0
 	for f := 0; f < p.framesPerChunk; f++ {
 		off := f * p.frameLen * 2
 		for i := range frame {
@@ -48,13 +48,13 @@ func (p *Processor) ProcessChunk(raw []byte) (voiceCount int) {
 		}
 		result, err := p.vad.Process(frame)
 		if err != nil {
-			log.Fatal("vad error:", err)
+			return 0, fmt.Errorf("vad process frame %d: %w", f, err)
 		}
 		if result == webvad.ResultVoice {
 			voiceCount++
 		}
 	}
-	return
+	return voiceCount, nil
 }
 
 func (p *Processor) IsVoice(voiceCount int) bool {

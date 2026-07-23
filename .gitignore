@@ -5,3 +5,4 @@ recordings/
 .idea/
 .vscode/
 *.exe
+/vad

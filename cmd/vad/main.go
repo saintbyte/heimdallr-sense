@@ -25,7 +25,7 @@ func main() {
 
 	if cfg.RecordMode != "none" && cfg.RecordMode != "" {
 		if err := os.MkdirAll(cfg.RecordDir, 0755); err != nil {
-			log.Fatal("create record dir", "error", err)
+			log.Fatal("create record dir", "error", err, "dir", cfg.RecordDir)
 		}
 	}
 
@@ -39,7 +39,7 @@ func main() {
 	}
 
 	if err := cmd.Start(); err != nil {
-		log.Fatal("start pw-cat", "error", err)
+		log.Fatal("start audio source", "error", err, "cmd", name)
 	}
 
 	log.Info("listening",
@@ -49,6 +49,7 @@ func main() {
 		"voice_threshold", cfg.VoiceThreshold,
 		"silence_threshold", cfg.SilenceThreshold,
 		"record_mode", cfg.RecordMode,
+		"audio_source", cfg.AudioSource,
 	)
 
 	preBuffer := ring.New(cfg.PreBufferChunks)
@@ -62,7 +63,9 @@ func main() {
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 		<-ch
 		log.Info("stopping")
-		cmd.Process.Signal(syscall.SIGTERM)
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			log.Error("signal process", "error", err)
+		}
 		os.Exit(0)
 	}()
 
@@ -70,14 +73,18 @@ func main() {
 		raw := make([]byte, proc.ChunkBytes())
 		if _, err := io.ReadFull(stdout, raw); err != nil {
 			if err == io.EOF {
-				log.Info("pw-cat exited")
+				log.Info("audio source exited")
 			} else {
-				log.Fatal("read error", "error", err)
+				log.Error("read audio", "error", err)
 			}
 			break
 		}
 
-		voiceCount := proc.ProcessChunk(raw)
+		voiceCount, err := proc.ProcessChunk(raw)
+		if err != nil {
+			log.Error("process chunk", "error", err)
+			continue
+		}
 		isVoice := proc.IsVoice(voiceCount)
 
 		if isVoice {
@@ -109,15 +116,16 @@ func main() {
 						filename := recordStart.Format("2006-01-02_15-04-05.000") + ".wav"
 						duration := float64(len(samples)) / float64(cfg.SampleRate)
 
-						log.Info("recording saved",
+						log.Info("recording ready",
 							"chunks", len(recording),
 							"duration_s", fmt.Sprintf("%.1f", duration),
+							"filename", filename,
 						)
 
 						if cfg.RecordMode == "file" || cfg.RecordMode == "both" {
 							path, err := recorder.SaveFile(cfg.RecordDir, filename, samples, cfg.SampleRate)
 							if err != nil {
-								log.Error("save wav", "error", err)
+								log.Error("save wav", "error", err, "path", path)
 							} else {
 								log.Info("file saved", "path", path)
 							}
@@ -126,9 +134,9 @@ func main() {
 						if (cfg.RecordMode == "https" || cfg.RecordMode == "both") && cfg.HTTPSUrl != "" {
 							if err := recorder.UploadHTTPS(cfg.HTTPSUrl, samples, cfg.SampleRate,
 								cfg.HTTPTimeout, cfg.TLSSkipVerify, filename); err != nil {
-								log.Error("upload failed", "error", err)
+								log.Error("upload failed", "error", err, "url", cfg.HTTPSUrl)
 							} else {
-								log.Info("uploaded", "url", cfg.HTTPSUrl)
+								log.Info("uploaded", "url", cfg.HTTPSUrl, "filename", filename)
 							}
 						}
 
@@ -145,5 +153,7 @@ func main() {
 		wasVoice = !(silentChunks >= proc.SilenceThreshold())
 	}
 
-	cmd.Wait()
+	if err := cmd.Wait(); err != nil {
+		log.Error("audio source finished", "error", err)
+	}
 }
