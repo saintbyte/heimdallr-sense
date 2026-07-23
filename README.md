@@ -176,31 +176,13 @@ async def upload(file: UploadFile):
 
 ### systemd
 
-Создай файл `/etc/systemd/system/heimdallr-sense.service`:
-
-```ini
-[Unit]
-Description=Heimdallr Sense - Voice Activity Detection
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/heimdallr-sense
-WorkingDirectory=/etc/heimdallr
-Restart=on-failure
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-```
+Файл сервиса: `systemd/heimdallr-sense.service`
 
 ```bash
 sudo cp build/heimdallr-sense-linux-amd64 /usr/local/bin/heimdallr-sense
 sudo mkdir -p /etc/heimdallr-sense
 sudo cp config.yaml /etc/heimdallr-sense/config.yaml
-sudo cp heimdallr-sense.service /etc/systemd/system/
+sudo cp systemd/heimdallr-sense.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now heimdallr-sense
 
@@ -210,57 +192,13 @@ journalctl -u heimdallr-sense -f
 
 ### SystemV (init.d)
 
-Создай файл `/etc/init.d/heimdallr-sense`:
-
-```bash
-#!/bin/sh
-### BEGIN INIT INFO
-# Provides:          heimdallr-sense
-# Required-Start:    $local_fs $network
-# Required-Stop:     $local_fs $network
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: Voice Activity Detection
-# Description:       Heimdallr Sense VAD service
-### END INIT INFO
-
-NAME=heimdallr-sense
-DAEMON=/usr/local/bin/$NAME
-CONFIG=/etc/heimdallr-sense/config.yaml
-PIDFILE=/var/run/$NAME.pid
-LOGFILE=/var/log/$NAME.log
-
-case "$1" in
-    start)
-        echo "Starting $NAME"
-        nohup $DAEMON -config $CONFIG >> $LOGFILE 2>&1 &
-        echo $! > $PIDFILE
-        ;;
-    stop)
-        if [ -f $PIDFILE ]; then
-            echo "Stopping $NAME"
-            kill $(cat $PIDFILE)
-            rm $PIDFILE
-        fi
-        ;;
-    restart)
-        $0 stop
-        sleep 1
-        $0 start
-        ;;
-    *)
-        echo "Usage: $0 {start|stop|restart}"
-        exit 1
-        ;;
-esac
-exit 0
-```
+Файл скрипта: `systemd/heimdallr-sense.init`
 
 ```bash
 sudo cp build/heimdallr-sense-linux-amd64 /usr/local/bin/heimdallr-sense
 sudo mkdir -p /etc/heimdallr-sense
 sudo cp config.yaml /etc/heimdallr-sense/config.yaml
-sudo cp heimdallr-sense.init /etc/init.d/heimdallr-sense
+sudo cp systemd/heimdallr-sense.init /etc/init.d/heimdallr-sense
 sudo chmod +x /etc/init.d/heimdallr-sense
 sudo update-rc.d heimdallr-sense defaults
 

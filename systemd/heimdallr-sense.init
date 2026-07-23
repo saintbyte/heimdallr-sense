@@ -1,0 +1,41 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          heimdallr-sense
+# Required-Start:    $local_fs $network $sound
+# Required-Stop:     $local_fs $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Voice Activity Detection
+# Description:       Heimdallr Sense VAD service
+### END INIT INFO
+
+NAME=heimdallr-sense
+DAEMON=/usr/local/bin/$NAME
+CONFIG=/etc/heimdallr-sense/config.yaml
+PIDFILE=/var/run/$NAME.pid
+LOGFILE=/var/log/$NAME.log
+
+case "$1" in
+    start)
+        echo "Starting $NAME"
+        nohup $DAEMON >> $LOGFILE 2>&1 &
+        echo $! > $PIDFILE
+        ;;
+    stop)
+        if [ -f $PIDFILE ]; then
+            echo "Stopping $NAME"
+            kill $(cat $PIDFILE)
+            rm $PIDFILE
+        fi
+        ;;
+    restart)
+        $0 stop
+        sleep 1
+        $0 start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+exit 0

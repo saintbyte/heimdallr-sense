@@ -1,0 +1,15 @@
+[Unit]
+Description=Heimdallr Sense - Voice Activity Detection
+After=network.target sound.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/heimdallr-sense
+WorkingDirectory=/etc/heimdallr-sense
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
