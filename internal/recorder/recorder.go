@@ -12,11 +12,11 @@ import (
 )
 
 func WriteWAV(filename string, data []int16, sampleRate int) error {
-	tmp := filename + ".tmp"
-	f, err := os.Create(tmp)
+	f, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	dataSize := len(data) * 2
 	fileSize := 36 + dataSize
@@ -38,13 +38,7 @@ func WriteWAV(filename string, data []int16, sampleRate int) error {
 	for _, s := range data {
 		binary.Write(f, binary.LittleEndian, s)
 	}
-
-	if err := f.Close(); err != nil {
-		os.Remove(tmp)
-		return err
-	}
-
-	return os.Rename(tmp, filename)
+	return nil
 }
 
 func UploadHTTPS(url string, data []int16, sampleRate int, timeout int, skipVerify bool, filename string) error {
