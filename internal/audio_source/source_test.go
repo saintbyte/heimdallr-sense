@@ -23,8 +23,8 @@ func cfgArecord() *config.Config {
 
 func cfgCustom() *config.Config {
 	return &config.Config{
-		SampleRate:  8000,
-		AudioSource: "custom",
+		SampleRate:   8000,
+		AudioSource:  "custom",
 		AudioCommand: "cat -",
 	}
 }
@@ -57,8 +57,8 @@ func TestStartCat(t *testing.T) {
 
 func TestStop(t *testing.T) {
 	s := New(&config.Config{
-		SampleRate:  8000,
-		AudioSource: "custom",
+		SampleRate:   8000,
+		AudioSource:  "custom",
 		AudioCommand: "sleep 100",
 	})
 	if err := s.Start(); err != nil {
@@ -77,8 +77,8 @@ func TestStop(t *testing.T) {
 
 func TestWaitNotStarted(t *testing.T) {
 	s := New(&config.Config{
-		SampleRate:  8000,
-		AudioSource: "custom",
+		SampleRate:   8000,
+		AudioSource:  "custom",
 		AudioCommand: "sleep 1",
 	})
 	err := s.Wait()
@@ -89,8 +89,8 @@ func TestWaitNotStarted(t *testing.T) {
 
 func TestStopNotStarted(t *testing.T) {
 	s := New(&config.Config{
-		SampleRate:  8000,
-		AudioSource: "custom",
+		SampleRate:   8000,
+		AudioSource:  "custom",
 		AudioCommand: "sleep 1",
 	})
 	err := s.Stop()
@@ -101,8 +101,8 @@ func TestStopNotStarted(t *testing.T) {
 
 func TestNotFound(t *testing.T) {
 	s := New(&config.Config{
-		SampleRate:  8000,
-		AudioSource: "custom",
+		SampleRate:   8000,
+		AudioSource:  "custom",
 		AudioCommand: "nonexistent_binary_12345",
 	})
 	err := s.Start()
@@ -114,8 +114,8 @@ func TestNotFound(t *testing.T) {
 
 func TestStartTrue(t *testing.T) {
 	s := New(&config.Config{
-		SampleRate:  8000,
-		AudioSource: "custom",
+		SampleRate:   8000,
+		AudioSource:  "custom",
 		AudioCommand: "true",
 	})
 	if err := s.Start(); err != nil {

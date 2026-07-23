@@ -11,8 +11,8 @@ import (
 	"github.com/saintbyte/heimdallr-sense/internal/audio_source"
 	"github.com/saintbyte/heimdallr-sense/internal/config"
 	"github.com/saintbyte/heimdallr-sense/internal/log"
-	"github.com/saintbyte/heimdallr-sense/internal/ring"
 	"github.com/saintbyte/heimdallr-sense/internal/recorder"
+	"github.com/saintbyte/heimdallr-sense/internal/ring"
 	"github.com/saintbyte/heimdallr-sense/internal/vad"
 )
 
@@ -20,18 +20,24 @@ func main() {
 	cfg := config.Load("config.yaml")
 	log.Init(cfg.LogEnabled)
 
-	proc := vad.NewProcessor(cfg.SampleRate, cfg.VadFrameMs, cfg.FramesPerChunk,
-		cfg.VoiceThreshold, cfg.SilenceThreshold, cfg.VadMode)
+	src := audio_source.New(&cfg)
+	if err := src.Start(); err != nil {
+		log.Fatal("start audio source", "error", err, "audio_source", cfg.AudioSource)
+	}
+
+	proc := vad.NewProcessor(
+		cfg.SampleRate,
+		cfg.VadFrameMs,
+		cfg.FramesPerChunk,
+		cfg.VoiceThreshold,
+		cfg.SilenceThreshold,
+		cfg.VadMode,
+	)
 
 	if cfg.RecordMode != "none" && cfg.RecordMode != "" {
 		if err := os.MkdirAll(cfg.RecordDir, 0755); err != nil {
 			log.Fatal("create record dir", "error", err, "dir", cfg.RecordDir)
 		}
-	}
-
-	src := audio_source.New(&cfg)
-	if err := src.Start(); err != nil {
-		log.Fatal("start audio source", "error", err, "audio_source", cfg.AudioSource)
 	}
 
 	log.Info("listening",

@@ -8,8 +8,8 @@ import (
 var logger *slog.Logger
 var enabled bool
 
-func Init(e bool) {
-	enabled = e
+func Init(isEnabled bool) {
+	enabled = isEnabled
 	if enabled {
 		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelInfo,
