@@ -5,7 +5,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
+
+	"github.com/saintbyte/heimdallr-sense/internal/config"
 )
 
 type Source struct {
@@ -14,9 +17,37 @@ type Source struct {
 	stdout io.ReadCloser
 }
 
-func New(name string, args []string) *Source {
+func New(cfg *config.Config) *Source {
+	name, args := buildCommand(cfg)
 	return &Source{
 		cmd: exec.Command(name, args...),
+	}
+}
+
+func buildCommand(cfg *config.Config) (name string, args []string) {
+	rate := fmt.Sprint(cfg.SampleRate)
+
+	switch cfg.AudioSource {
+	case "arecord":
+		return "arecord", []string{
+			"-q",
+			"-f", "S16_LE",
+			"-r", rate,
+			"-c", "1",
+			"-t", "raw",
+			"-",
+		}
+	case "custom":
+		parts := strings.Fields(cfg.AudioCommand)
+		return parts[0], parts[1:]
+	default: // pw-cat
+		return "pw-cat", []string{
+			"-r",
+			"--format", "s16",
+			"--rate", rate,
+			"--channels", "1",
+			"-",
+		}
 	}
 }
 

@@ -29,10 +29,9 @@ func main() {
 		}
 	}
 
-	name, args := cfg.BuildCommand()
-	src := audio_source.New(name, args)
+	src := audio_source.New(&cfg)
 	if err := src.Start(); err != nil {
-		log.Fatal("start audio source", "error", err, "cmd", name)
+		log.Fatal("start audio source", "error", err, "audio_source", cfg.AudioSource)
 	}
 
 	log.Info("listening",

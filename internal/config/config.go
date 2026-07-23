@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -116,31 +115,4 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("http_timeout must be >= 1, got %d", cfg.HTTPTimeout)
 	}
 	return nil
-}
-
-func (c *Config) BuildCommand() (name string, args []string) {
-	rate := fmt.Sprint(c.SampleRate)
-
-	switch c.AudioSource {
-	case "arecord":
-		return "arecord", []string{
-			"-q",
-			"-f", "S16_LE",
-			"-r", rate,
-			"-c", "1",
-			"-t", "raw",
-			"-",
-		}
-	case "custom":
-		parts := strings.Fields(c.AudioCommand)
-		return parts[0], parts[1:]
-	default: // pw-cat
-		return "pw-cat", []string{
-			"-r",
-			"--format", "s16",
-			"--rate", rate,
-			"--channels", "1",
-			"-",
-		}
-	}
 }
