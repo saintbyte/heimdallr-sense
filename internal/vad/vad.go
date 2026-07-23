@@ -39,6 +39,9 @@ func (p *Processor) ChunkLen() int   { return p.chunkLen }
 func (p *Processor) ChunkBytes() int { return p.chunkLen * 2 }
 
 func (p *Processor) ProcessChunk(raw []byte) (int, error) {
+	if len(raw) < p.chunkLen*2 {
+		return 0, fmt.Errorf("chunk too short: got %d bytes, need %d", len(raw), p.chunkLen*2)
+	}
 	frame := make([]int16, p.frameLen)
 	voiceCount := 0
 	for f := 0; f < p.framesPerChunk; f++ {

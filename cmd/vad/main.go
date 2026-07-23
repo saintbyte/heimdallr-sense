@@ -31,6 +31,11 @@ func main() {
 
 	name, args := cfg.BuildCommand()
 	cmd := exec.Command(name, args...)
+
+	if _, err := exec.LookPath(name); err != nil {
+		log.Fatal("audio source not found", "error", err, "cmd", name)
+	}
+
 	cmd.Stderr = os.Stderr
 
 	stdout, err := cmd.StdoutPipe()
