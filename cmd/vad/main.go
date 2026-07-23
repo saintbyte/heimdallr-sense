@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/saintbyte/heimdallr-sense/internal/audio"
+	"github.com/saintbyte/heimdallr-sense/internal/audio_source"
 	"github.com/saintbyte/heimdallr-sense/internal/config"
 	"github.com/saintbyte/heimdallr-sense/internal/log"
 	"github.com/saintbyte/heimdallr-sense/internal/ring"
@@ -30,7 +30,7 @@ func main() {
 	}
 
 	name, args := cfg.BuildCommand()
-	src := audio.New(name, args)
+	src := audio_source.New(name, args)
 	if err := src.Start(); err != nil {
 		log.Fatal("start audio source", "error", err, "cmd", name)
 	}
