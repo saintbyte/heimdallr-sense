@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -74,9 +75,29 @@ func WriteWAV(filename string, data []int16, sampleRate int) error {
 	return nil
 }
 
-func UploadHTTPS(url string, data []int16, sampleRate int, timeout int, skipVerify bool, filename string) error {
+func UploadHTTPS(rawURL string, data []int16, sampleRate int, timeout int, skipVerify bool, filename string) error {
 	var buf bytes.Buffer
+	duration := float64(len(data)) / float64(sampleRate)
 
+	// field: filename
+	buf.WriteString("--boundary\r\n")
+	buf.WriteString("Content-Disposition: form-data; name=\"filename\"\r\n\r\n")
+	buf.WriteString(filename)
+	buf.WriteString("\r\n")
+
+	// field: sample_rate
+	buf.WriteString("--boundary\r\n")
+	buf.WriteString("Content-Disposition: form-data; name=\"sample_rate\"\r\n\r\n")
+	buf.WriteString(fmt.Sprintf("%d", sampleRate))
+	buf.WriteString("\r\n")
+
+	// field: duration
+	buf.WriteString("--boundary\r\n")
+	buf.WriteString("Content-Disposition: form-data; name=\"duration\"\r\n\r\n")
+	buf.WriteString(fmt.Sprintf("%.2f", duration))
+	buf.WriteString("\r\n")
+
+	// field: file
 	buf.WriteString("--boundary\r\n")
 	buf.WriteString("Content-Disposition: form-data; name=\"file\"; filename=\"")
 	buf.WriteString(filename)
@@ -114,7 +135,15 @@ func UploadHTTPS(url string, data []int16, sampleRate int, timeout int, skipVeri
 		Transport: transport,
 	}
 
-	resp, err := client.Post(url, "multipart/form-data; boundary=boundary", &buf)
+	uploadURL, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("parse URL: %w", err)
+	}
+	q := uploadURL.Query()
+	q.Set("filename", filename)
+	uploadURL.RawQuery = q.Encode()
+
+	resp, err := client.Post(uploadURL.String(), "multipart/form-data; boundary=boundary", &buf)
 	if err != nil {
 		return fmt.Errorf("HTTPS POST: %w", err)
 	}
