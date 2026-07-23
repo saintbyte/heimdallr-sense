@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/saintbyte/heimdallr-sense/internal/audio"
 	"github.com/saintbyte/heimdallr-sense/internal/config"
 	"github.com/saintbyte/heimdallr-sense/internal/log"
 	"github.com/saintbyte/heimdallr-sense/internal/ring"
@@ -30,20 +30,8 @@ func main() {
 	}
 
 	name, args := cfg.BuildCommand()
-	cmd := exec.Command(name, args...)
-
-	if _, err := exec.LookPath(name); err != nil {
-		log.Fatal("audio source not found", "error", err, "cmd", name)
-	}
-
-	cmd.Stderr = os.Stderr
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Fatal("stdout pipe", "error", err)
-	}
-
-	if err := cmd.Start(); err != nil {
+	src := audio.New(name, args)
+	if err := src.Start(); err != nil {
 		log.Fatal("start audio source", "error", err, "cmd", name)
 	}
 
@@ -68,7 +56,7 @@ func main() {
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 		<-ch
 		log.Info("stopping")
-		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		if err := src.Stop(); err != nil {
 			log.Error("signal process", "error", err)
 		}
 		os.Exit(0)
@@ -76,7 +64,7 @@ func main() {
 
 	for {
 		raw := make([]byte, proc.ChunkBytes())
-		if _, err := io.ReadFull(stdout, raw); err != nil {
+		if _, err := io.ReadFull(src.Stdout(), raw); err != nil {
 			if err == io.EOF {
 				log.Info("audio source exited")
 			} else {
@@ -158,7 +146,7 @@ func main() {
 		wasVoice = !(silentChunks >= proc.SilenceThreshold())
 	}
 
-	if err := cmd.Wait(); err != nil {
+	if err := src.Wait(); err != nil {
 		log.Error("audio source finished", "error", err)
 	}
 }
