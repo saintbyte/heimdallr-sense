@@ -39,15 +39,16 @@ go build -o heimdallr-sense ./cmd/vad
 ./heimdallr-sense
 ```
 
-Пример вывода:
+Пример вывода (`log_enabled: true`):
 
-```
-Listening (rate=8000, frame=30ms, frames=5, voice>=4, silence>=3, record=file)
-[VOICE START]
-  recording started (pre-buffer: 3 chunks)
-[VOICE END]
-  recording saved: 8 chunks, 1.2s
-  file: ./recordings/2026-07-23_15-30-45.123.wav
+```json
+{"time":"2026-07-23T15:30:45Z","level":"INFO","msg":"config loaded from ./config.yaml"}
+{"time":"2026-07-23T15:30:45Z","level":"INFO","msg":"listening","rate":8000,"frame_ms":30,"frames":5,"voice_threshold":4,"silence_threshold":3,"record_mode":"file"}
+{"time":"2026-07-23T15:30:46Z","level":"INFO","msg":"voice start"}
+{"time":"2026-07-23T15:30:46Z","level":"INFO","msg":"recording started","pre_buffer_chunks":3}
+{"time":"2026-07-23T15:30:48Z","level":"INFO","msg":"voice end"}
+{"time":"2026-07-23T15:30:48Z","level":"INFO","msg":"recording saved","chunks":8,"duration_s":"1.2"}
+{"time":"2026-07-23T15:30:48Z","level":"INFO","msg":"file saved","path":"./recordings/2026-07-23_15-30-46.000.wav"}
 ```
 
 Ctrl+C для остановки.
@@ -69,12 +70,19 @@ voice_threshold: 4
 silence_threshold: 3
 vad_mode: 3
 
+# audio_source: pw-cat, arecord, custom
+audio_source: pw-cat
+audio_command: ""
+
 # recording: none, file, https, both
 record_mode: file
 record_dir: ./recordings
 pre_buffer_chunks: 3
 https_url: ""
 http_timeout: 10
+min_chunks: 3
+tls_skip_verify: false
+log_enabled: true
 ```
 
 ### Параметры VAD
@@ -118,6 +126,9 @@ audio_command: "ssh remote-host arecord -f S16_LE -r 8000 -c 1 -t raw -"
 | `pre_buffer_chunks` | Чанков в кольцевом буфере (запись до голоса) | 3 |
 | `https_url` | URL для POST-запроса (multipart/form-data) | "" |
 | `http_timeout` | Таймаут HTTP-запроса (сек) | 10 |
+| `min_chunks` | Мин. чанков для сохранения записи (отсекает короткие шумы) | 3 |
+| `tls_skip_verify` | Игнорировать проверку TLS-сертификата | false |
+| `log_enabled` | Включить JSON-логи (slog) | true |
 
 ### Расчёт окна
 
@@ -187,7 +198,8 @@ WantedBy=multi-user.target
 
 ```bash
 sudo cp build/heimdallr-sense-linux-amd64 /usr/local/bin/heimdallr-sense
-sudo cp config.yaml /etc/heimdallr/config.yaml
+sudo mkdir -p /etc/heimdallr-sense
+sudo cp config.yaml /etc/heimdallr-sense/config.yaml
 sudo cp heimdallr-sense.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now heimdallr-sense
@@ -214,7 +226,7 @@ journalctl -u heimdallr-sense -f
 
 NAME=heimdallr-sense
 DAEMON=/usr/local/bin/$NAME
-CONFIG=/etc/heimdallr/config.yaml
+CONFIG=/etc/heimdallr-sense/config.yaml
 PIDFILE=/var/run/$NAME.pid
 LOGFILE=/var/log/$NAME.log
 
@@ -246,7 +258,8 @@ exit 0
 
 ```bash
 sudo cp build/heimdallr-sense-linux-amd64 /usr/local/bin/heimdallr-sense
-sudo cp config.yaml /etc/heimdallr/config.yaml
+sudo mkdir -p /etc/heimdallr-sense
+sudo cp config.yaml /etc/heimdallr-sense/config.yaml
 sudo cp heimdallr-sense.init /etc/init.d/heimdallr-sense
 sudo chmod +x /etc/init.d/heimdallr-sense
 sudo update-rc.d heimdallr-sense defaults
