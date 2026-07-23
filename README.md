@@ -178,33 +178,98 @@ async def upload(file: UploadFile):
 
 Файл сервиса: `systemd/heimdallr-sense.service`
 
+**Установка:**
+
 ```bash
+# бинарник
 sudo cp build/heimdallr-sense-linux-amd64 /usr/local/bin/heimdallr-sense
+sudo chmod +x /usr/local/bin/heimdallr-sense
+
+# конфиг
 sudo mkdir -p /etc/heimdallr-sense
 sudo cp config.yaml /etc/heimdallr-sense/config.yaml
+
+# сервис
 sudo cp systemd/heimdallr-sense.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now heimdallr-sense
+sudo systemctl enable heimdallr-sense
+sudo systemctl start heimdallr-sense
+```
 
-# логи
-journalctl -u heimdallr-sense -f
+**Управление:**
+
+```bash
+sudo systemctl start heimdallr-sense     # запустить
+sudo systemctl stop heimdallr-sense      # остановить
+sudo systemctl restart heimdallr-sense   # перезапустить
+sudo systemctl status heimdallr-sense    # статус
+sudo systemctl disable heimdallr-sense   # отключить автозапуск
+```
+
+**Логи:**
+
+```bash
+journalctl -u heimdallr-sense -f              # следить в реальном времени
+journalctl -u heimdallr-sense --since today    # за сегодня
+journalctl -u heimdallr-sense -n 50            # последние 50 строк
+```
+
+**Доступ к микрофону:**
+
+Если сервис запускается от root, доступ к PipeWire/ALSA может потребовать дополнительных настроек:
+
+```bash
+# добавить в [Service] если нужен доступ к PulseAudio/PipeWire
+Environment="PULSE_SERVER=unix:/run/user/1000/pulse/native"
+# или запускать от пользователя, у которого есть доступ к микрофону
+User=sb
+Group=sb
 ```
 
 ### SystemV (init.d)
 
 Файл скрипта: `systemd/heimdallr-sense.init`
 
+**Установка:**
+
 ```bash
+# бинарник
 sudo cp build/heimdallr-sense-linux-amd64 /usr/local/bin/heimdallr-sense
+sudo chmod +x /usr/local/bin/heimdallr-sense
+
+# конфиг
 sudo mkdir -p /etc/heimdallr-sense
 sudo cp config.yaml /etc/heimdallr-sense/config.yaml
+
+# init-скрипт
 sudo cp systemd/heimdallr-sense.init /etc/init.d/heimdallr-sense
 sudo chmod +x /etc/init.d/heimdallr-sense
-sudo update-rc.d heimdallr-sense defaults
 
-# ручное управление
-sudo service heimdallr-sense start
-sudo service heimdallr-sense stop
+# регистрация в автозагрузке
+sudo update-rc.d heimdallr-sense defaults
+```
+
+**Управление:**
+
+```bash
+sudo service heimdallr-sense start     # запустить
+sudo service heimdallr-sense stop      # остановить
+sudo service heimdallr-sense restart   # перезапустить
+```
+
+**Логи:**
+
+```bash
+tail -f /var/log/heimdallr-sense.log
+```
+
+**Деинсталляция:**
+
+```bash
+sudo update-rc.d -f heimdallr-sense remove
+sudo rm /etc/init.d/heimdallr-sense
+sudo rm /etc/heimdallr-sense/config.yaml
+sudo rm /usr/local/bin/heimdallr-sense
 ```
 
 ## Архитектура
