@@ -10,6 +10,7 @@ import (
 
 type Source struct {
 	cmd    *exec.Cmd
+	stdin  io.WriteCloser
 	stdout io.ReadCloser
 }
 
@@ -26,6 +27,12 @@ func (s *Source) Start() error {
 
 	s.cmd.Stderr = os.Stderr
 
+	stdin, err := s.cmd.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("stdin pipe: %w", err)
+	}
+	s.stdin = stdin
+
 	stdout, err := s.cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("stdout pipe: %w", err)
@@ -37,6 +44,10 @@ func (s *Source) Start() error {
 	}
 
 	return nil
+}
+
+func (s *Source) Stdin() io.WriteCloser {
+	return s.stdin
 }
 
 func (s *Source) Stdout() io.ReadCloser {
