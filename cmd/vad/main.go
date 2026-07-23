@@ -1,0 +1,149 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/saintbyte/heimdallr-sense/internal/config"
+	"github.com/saintbyte/heimdallr-sense/internal/log"
+	"github.com/saintbyte/heimdallr-sense/internal/ring"
+	"github.com/saintbyte/heimdallr-sense/internal/recorder"
+	"github.com/saintbyte/heimdallr-sense/internal/vad"
+)
+
+func main() {
+	cfg := config.Load("config.yaml")
+	log.Init(cfg.LogEnabled)
+
+	proc := vad.NewProcessor(cfg.SampleRate, cfg.VadFrameMs, cfg.FramesPerChunk,
+		cfg.VoiceThreshold, cfg.SilenceThreshold, cfg.VadMode)
+
+	if cfg.RecordMode != "none" && cfg.RecordMode != "" {
+		if err := os.MkdirAll(cfg.RecordDir, 0755); err != nil {
+			log.Fatal("create record dir", "error", err)
+		}
+	}
+
+	name, args := cfg.BuildCommand()
+	cmd := exec.Command(name, args...)
+	cmd.Stderr = os.Stderr
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal("stdout pipe", "error", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		log.Fatal("start pw-cat", "error", err)
+	}
+
+	log.Info("listening",
+		"rate", cfg.SampleRate,
+		"frame_ms", cfg.VadFrameMs,
+		"frames", cfg.FramesPerChunk,
+		"voice_threshold", cfg.VoiceThreshold,
+		"silence_threshold", cfg.SilenceThreshold,
+		"record_mode", cfg.RecordMode,
+	)
+
+	preBuffer := ring.New(cfg.PreBufferChunks)
+	wasVoice := false
+	silentChunks := 0
+	var recording [][]byte
+	var recordStart time.Time
+
+	go func() {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+		<-ch
+		log.Info("stopping")
+		cmd.Process.Signal(syscall.SIGTERM)
+		os.Exit(0)
+	}()
+
+	for {
+		raw := make([]byte, proc.ChunkBytes())
+		if _, err := io.ReadFull(stdout, raw); err != nil {
+			if err == io.EOF {
+				log.Info("pw-cat exited")
+			} else {
+				log.Fatal("read error", "error", err)
+			}
+			break
+		}
+
+		voiceCount := proc.ProcessChunk(raw)
+		isVoice := proc.IsVoice(voiceCount)
+
+		if isVoice {
+			silentChunks = 0
+			if !wasVoice {
+				log.Info("voice start")
+				if cfg.RecordMode != "none" && cfg.RecordMode != "" {
+					recordStart = time.Now()
+					recording = preBuffer.Flush()
+					recording = append(recording, raw)
+					log.Info("recording started", "pre_buffer_chunks", len(recording)-1)
+				}
+			} else if cfg.RecordMode != "none" && cfg.RecordMode != "" {
+				recording = append(recording, raw)
+			}
+		} else {
+			silentChunks++
+			if wasVoice && silentChunks >= proc.SilenceThreshold() {
+				log.Info("voice end")
+				if cfg.RecordMode != "none" && cfg.RecordMode != "" && recording != nil {
+					if len(recording) < cfg.MinChunks {
+						log.Info("recording discarded",
+							"chunks", len(recording),
+							"min_chunks", cfg.MinChunks,
+						)
+						recording = nil
+					} else {
+						samples := vad.MergeChunks(recording, proc.ChunkLen())
+						filename := recordStart.Format("2006-01-02_15-04-05.000") + ".wav"
+						duration := float64(len(samples)) / float64(cfg.SampleRate)
+
+						log.Info("recording saved",
+							"chunks", len(recording),
+							"duration_s", fmt.Sprintf("%.1f", duration),
+						)
+
+						if cfg.RecordMode == "file" || cfg.RecordMode == "both" {
+							path, err := recorder.SaveFile(cfg.RecordDir, filename, samples, cfg.SampleRate)
+							if err != nil {
+								log.Error("save wav", "error", err)
+							} else {
+								log.Info("file saved", "path", path)
+							}
+						}
+
+						if (cfg.RecordMode == "https" || cfg.RecordMode == "both") && cfg.HTTPSUrl != "" {
+							if err := recorder.UploadHTTPS(cfg.HTTPSUrl, samples, cfg.SampleRate,
+								cfg.HTTPTimeout, cfg.TLSSkipVerify, filename); err != nil {
+								log.Error("upload failed", "error", err)
+							} else {
+								log.Info("uploaded", "url", cfg.HTTPSUrl)
+							}
+						}
+
+						recording = nil
+					}
+				}
+			}
+		}
+
+		if cfg.RecordMode != "none" && cfg.RecordMode != "" && !isVoice && recording == nil {
+			preBuffer.Push(raw)
+		}
+
+		wasVoice = !(silentChunks >= proc.SilenceThreshold())
+	}
+
+	cmd.Wait()
+}

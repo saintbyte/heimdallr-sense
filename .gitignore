@@ -1,0 +1,7 @@
+build/
+recordings/
+*.wav
+.env
+.idea/
+.vscode/
+*.exe

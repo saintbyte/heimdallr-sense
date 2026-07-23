@@ -1,0 +1,20 @@
+sample_rate: 8000
+vad_frame_ms: 30
+frames_per_chunk: 5
+voice_threshold: 4
+silence_threshold: 3
+vad_mode: 3
+
+# audio_source: pw-cat, arecord, custom
+audio_source: pw-cat
+audio_command: ""
+
+# recording: none, file, https, both
+record_mode: file
+record_dir: ./recordings
+pre_buffer_chunks: 3
+https_url: ""
+http_timeout: 10
+min_chunks: 3
+tls_skip_verify: false
+log_enabled: true
