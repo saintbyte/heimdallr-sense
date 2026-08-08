@@ -74,7 +74,7 @@ vad_mode: 3
 audio_source: pw-cat
 audio_command: ""
 
-# recording: none, file, https, both
+# recording: none, file, http, https, both
 record_mode: file
 record_dir: ./recordings
 pre_buffer_chunks: 3
@@ -121,10 +121,10 @@ audio_command: "ssh remote-host arecord -f S16_LE -r 8000 -c 1 -t raw -"
 
 | Параметр | Описание | Дефолт |
 |---|---|---|
-| `record_mode` | Режим записи: `none`, `file`, `https`, `both` | none |
+| `record_mode` | Режим записи: `none`, `file`, `http`, `https`, `both` | none |
 | `record_dir` | Каталог для WAV-файлов | ./recordings |
 | `pre_buffer_chunks` | Чанков в кольцевом буфере (запись до голоса) | 3 |
-| `https_url` | URL для POST-запроса (multipart/form-data) | "" |
+| `https_url` | URL для POST-запроса (multipart/form-data), поддерживаются `http://` и `https://` | "" |
 | `http_timeout` | Таймаут HTTP-запроса (сек) | 10 |
 | `min_chunks` | Мин. чанков для сохранения записи (отсекает короткие шумы) | 3 |
 | `tls_skip_verify` | Игнорировать проверку TLS-сертификата | false |
@@ -152,7 +152,8 @@ audio_command: "ssh remote-host arecord -f S16_LE -r 8000 -c 1 -t raw -"
 |---|---|
 | `none` | Запись отключена |
 | `file` | Сохранение WAV в `record_dir` |
-| `https` | POST на `https_url` |
+| `http` | POST на `https_url` по HTTP |
+| `https` | POST на `https_url` по HTTPS |
 | `both` | И файл, и POST |
 
 ### Формат WAV-файлов
@@ -161,9 +162,38 @@ audio_command: "ssh remote-host arecord -f S16_LE -r 8000 -c 1 -t raw -"
 - Имя файла: `YYYY-MM-DD_HH-MM-SS.mmm.wav` (время начала записи)
 - Запись включает pre-buffer (аудио до детекции голоса)
 
-### HTTPS-загрузка
+### HTTPS/HTTP-загрузка
 
-Файл отправляется как `multipart/form-data` с полем `file`. Пример серверного обработчика:
+Режимы `http`, `https` и `both` отправляют WAV-файл на `https_url` методом POST
+в формате `multipart/form-data`. Адрес может начинаться с `http://` или `https://` —
+протокол определяется схемой URL, а не значением `record_mode`.
+
+Запрос содержит:
+
+- поля формы: `filename`, `sample_rate`, `duration`
+- файл `file` (WAV, 16-bit PCM mono)
+- query-параметр `filename` в URL
+
+Примеры конфигурации:
+
+```yaml
+# HTTP-отправка на локальный сервис
+record_mode: http
+https_url: http://127.0.0.1:8080/api/transcribe
+
+# HTTPS с игнорированием проверки сертификата
+record_mode: https
+https_url: https://example.com/upload
+tls_skip_verify: true
+```
+
+`tls_skip_verify` применяется только к `https://` URL, на `http://` он не влияет.
+
+При ошибке загрузки (недоступный сервер, таймаут, HTTP-статус >= 400) ошибка
+выводится в stderr и в JSON-лог. Если включён режим `both`, запись при этом не
+теряется — файл сохраняется в `record_dir`.
+
+Пример серверного обработчика:
 
 ```python
 @app.post("/upload")

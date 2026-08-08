@@ -129,10 +129,11 @@ func main() {
 							}
 						}
 
-						if (cfg.RecordMode == "https" || cfg.RecordMode == "both") && cfg.HTTPSUrl != "" {
-							if err := recorder.UploadHTTPS(cfg.HTTPSUrl, samples, cfg.SampleRate,
+						if (cfg.RecordMode == "http" || cfg.RecordMode == "https" || cfg.RecordMode == "both") && cfg.HTTPSUrl != "" {
+							if err := recorder.Upload(cfg.HTTPSUrl, samples, cfg.SampleRate,
 								cfg.HTTPTimeout, cfg.TLSSkipVerify, filename); err != nil {
-								log.Error("upload failed", "error", err, "url", cfg.HTTPSUrl)
+								fmt.Fprintf(os.Stderr, "upload failed: %v\n", err)
+								log.Error("upload failed", "error", err, "url", cfg.HTTPSUrl, "filename", filename)
 							} else {
 								log.Info("uploaded", "url", cfg.HTTPSUrl, "filename", filename)
 							}

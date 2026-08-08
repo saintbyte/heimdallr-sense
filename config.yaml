@@ -9,12 +9,12 @@ vad_mode: 3
 audio_source: pw-cat
 audio_command: ""
 
-# recording: none, file, https, both
-record_mode: file
+# recording: none, file, http, https, both
+record_mode: https
 record_dir: ./recordings
 pre_buffer_chunks: 3
-https_url: ""
+https_url: http://127.0.0.1:8080/Bapi/transcribe
 http_timeout: 10
-min_chunks: 3
+min_chunks: 8
 tls_skip_verify: false
 log_enabled: true

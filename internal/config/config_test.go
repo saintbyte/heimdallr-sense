@@ -238,3 +238,58 @@ func TestValidateHTTPTimeout(t *testing.T) {
 		t.Error("http_timeout 0: expected error, got nil")
 	}
 }
+
+func TestValidateRecordMode(t *testing.T) {
+	for _, mode := range []string{"none", "file", ""} {
+		cfg := defaults
+		cfg.RecordMode = mode
+		if err := validate(&cfg); err != nil {
+			t.Errorf("record_mode %q: unexpected error: %v", mode, err)
+		}
+	}
+	for _, mode := range []string{"http", "https", "both"} {
+		cfg := defaults
+		cfg.RecordMode = mode
+		cfg.HTTPSUrl = "http://example.com/upload"
+		if err := validate(&cfg); err != nil {
+			t.Errorf("record_mode %q: unexpected error: %v", mode, err)
+		}
+	}
+
+	cfg := defaults
+	cfg.RecordMode = "invalid"
+	if err := validate(&cfg); err == nil {
+		t.Error("record_mode invalid: expected error, got nil")
+	}
+}
+
+func TestValidateUploadURL(t *testing.T) {
+	for _, mode := range []string{"http", "https", "both"} {
+		cfg := defaults
+		cfg.RecordMode = mode
+		cfg.HTTPSUrl = "http://example.com/upload"
+		if err := validate(&cfg); err != nil {
+			t.Errorf("record_mode %q with http url: unexpected error: %v", mode, err)
+		}
+
+		cfg.HTTPSUrl = "https://example.com/upload"
+		if err := validate(&cfg); err != nil {
+			t.Errorf("record_mode %q with https url: unexpected error: %v", mode, err)
+		}
+
+		cfg.HTTPSUrl = ""
+		if err := validate(&cfg); err == nil {
+			t.Errorf("record_mode %q with empty url: expected error, got nil", mode)
+		}
+
+		cfg.HTTPSUrl = "ftp://example.com/upload"
+		if err := validate(&cfg); err == nil {
+			t.Errorf("record_mode %q with ftp url: expected error, got nil", mode)
+		}
+
+		cfg.HTTPSUrl = "http://"
+		if err := validate(&cfg); err == nil {
+			t.Errorf("record_mode %q with hostless url: expected error, got nil", mode)
+		}
+	}
+}

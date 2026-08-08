@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -113,6 +114,26 @@ func validate(cfg *Config) error {
 	}
 	if cfg.HTTPTimeout < 1 {
 		return fmt.Errorf("http_timeout must be >= 1, got %d", cfg.HTTPTimeout)
+	}
+	switch cfg.RecordMode {
+	case "none", "file", "http", "https", "both", "":
+	default:
+		return fmt.Errorf("record_mode must be none, file, http, https, or both, got %q", cfg.RecordMode)
+	}
+	if cfg.RecordMode == "http" || cfg.RecordMode == "https" || cfg.RecordMode == "both" {
+		if cfg.HTTPSUrl == "" {
+			return fmt.Errorf("https_url is required when record_mode is %q", cfg.RecordMode)
+		}
+		u, err := url.Parse(cfg.HTTPSUrl)
+		if err != nil {
+			return fmt.Errorf("invalid https_url %q: %w", cfg.HTTPSUrl, err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return fmt.Errorf("https_url must use http:// or https:// scheme, got %q", cfg.HTTPSUrl)
+		}
+		if u.Host == "" {
+			return fmt.Errorf("https_url must include a host, got %q", cfg.HTTPSUrl)
+		}
 	}
 	return nil
 }

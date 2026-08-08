@@ -6,10 +6,27 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
 func TestUploadHTTPS(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS == nil {
+			t.Error("expected TLS connection")
+		}
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	samples := []int16{100, -100, 200, -200, 300, -300}
+	err := Upload(srv.URL, samples, 8000, 5, true, "test-recording.wav")
+	if err != nil {
+		t.Fatalf("upload failed: %v", err)
+	}
+}
+
+func TestUploadHTTP(t *testing.T) {
 	var receivedFields map[string]string
 	var receivedFile string
 	var receivedFilename string
@@ -49,7 +66,7 @@ func TestUploadHTTPS(t *testing.T) {
 	defer srv.Close()
 
 	samples := []int16{100, -100, 200, -200, 300, -300}
-	err := UploadHTTPS(srv.URL, samples, 8000, 5, false, "test-recording.wav")
+	err := Upload(srv.URL, samples, 8000, 5, false, "test-recording.wav")
 	if err != nil {
 		t.Fatalf("upload failed: %v", err)
 	}
@@ -72,4 +89,29 @@ func TestUploadHTTPS(t *testing.T) {
 
 	t.Logf("fields: %v", receivedFields)
 	t.Logf("file: name=%s size=%d", receivedFilename, len(receivedFile))
+}
+
+func TestUploadUnsupportedScheme(t *testing.T) {
+	err := Upload("ftp://example.com/upload", []int16{1}, 8000, 5, false, "test.wav")
+	if err == nil {
+		t.Fatal("expected error for ftp scheme, got nil")
+	}
+	if !strings.Contains(err.Error(), "unsupported URL scheme") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestUploadServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	err := Upload(srv.URL, []int16{1}, 8000, 5, false, "test.wav")
+	if err == nil {
+		t.Fatal("expected error for 500 status, got nil")
+	}
+	if !strings.Contains(err.Error(), "500") || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("unexpected error: %v", err)
+	}
 }

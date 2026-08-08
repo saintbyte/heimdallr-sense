@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -52,7 +53,18 @@ func WriteWAV(filename string, data []int16, sampleRate int) error {
 	return nil
 }
 
-func UploadHTTPS(rawURL string, data []int16, sampleRate int, timeout int, skipVerify bool, filename string) error {
+func Upload(rawURL string, data []int16, sampleRate int, timeout int, skipVerify bool, filename string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("parse upload URL %q: %w", rawURL, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported URL scheme %q in %q (use http:// or https://)", u.Scheme, rawURL)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("upload URL %q must include a host", rawURL)
+	}
+
 	duration := float64(len(data)) / float64(sampleRate)
 
 	var body bytes.Buffer
@@ -78,31 +90,29 @@ func UploadHTTPS(rawURL string, data []int16, sampleRate int, timeout int, skipV
 		return fmt.Errorf("close multipart writer: %w", err)
 	}
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: skipVerify},
+	transport := &http.Transport{}
+	if u.Scheme == "https" && skipVerify {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	client := &http.Client{
 		Timeout:   time.Duration(timeout) * time.Second,
 		Transport: transport,
 	}
 
-	uploadURL, err := url.Parse(rawURL)
-	if err != nil {
-		return fmt.Errorf("parse URL: %w", err)
-	}
-	q := uploadURL.Query()
+	q := u.Query()
 	q.Set("filename", filename)
-	uploadURL.RawQuery = q.Encode()
+	u.RawQuery = q.Encode()
 
-	resp, err := client.Post(uploadURL.String(), w.FormDataContentType(), &body)
+	resp, err := client.Post(u.String(), w.FormDataContentType(), &body)
 	if err != nil {
-		return fmt.Errorf("HTTPS POST: %w", err)
+		return fmt.Errorf("POST %s: %w", u.Redacted(), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("HTTPS upload status %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("upload to %s returned status %d: %s",
+			u.Redacted(), resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
 	return nil
 }
